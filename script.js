@@ -1,32 +1,56 @@
-const API_KEY = 'e3e3ec48';  // Replace with your actual OMDb API key
+const chatBox = document.getElementById("chat-box");
+const userInput = document.getElementById("user-input");
+const sendBtn = document.getElementById("send-btn");
+const voiceBtn = document.getElementById("voice-btn");
 
-document.getElementById('search-form').addEventListener('submit', async function (e) {
-  e.preventDefault();
+function appendMessage(sender, message) {
+  const div = document.createElement("div");
+  div.classList.add("message", sender);
+  div.textContent = message;
+  chatBox.appendChild(div);
+  chatBox.scrollTop = chatBox.scrollHeight;
+}
 
-  const query = document.getElementById('search-input').value.trim();
-  const resultDiv = document.getElementById('result');
-  resultDiv.innerHTML = 'Loading...';
-
+async function getBotResponse(input) {
   try {
-    const res = await fetch(`https://www.omdbapi.com/?t=${encodeURIComponent(query)}&apikey=${API_KEY}`);
+    const res = await fetch("/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: input })
+    });
     const data = await res.json();
-
-    if (data.Response === "False") {
-      resultDiv.innerHTML = `<p>❌ Movie/TV show not found.</p>`;
-      return;
-    }
-
-    resultDiv.innerHTML = `
-      <h2>${data.Title} (${data.Year})</h2>
-      <img src="${data.Poster !== "N/A" ? data.Poster : ''}" alt="Poster">
-      <p><strong>IMDb Rating:</strong> ${data.imdbRating}</p>
-      <p><strong>Genre:</strong> ${data.Genre}</p>
-      <p><strong>Plot:</strong> ${data.Plot}</p>
-      <p><strong>Actors:</strong> ${data.Actors}</p>
-      <p><strong>Director:</strong> ${data.Director}</p>
-    `;
-  } catch (error) {
-    resultDiv.innerHTML = `<p>Error fetching data. Try again later.</p>`;
-    console.error(error);
+    appendMessage("bot", data.response);
+  } catch (err) {
+    console.error(err);
+    appendMessage("bot", "Error contacting ChatGPT.");
   }
-});
+}
+
+sendBtn.onclick = () => {
+  const text = userInput.value.trim();
+  if (text === "") return;
+  appendMessage("user", text);
+  userInput.value = "";
+  getBotResponse(text);
+};
+
+voiceBtn.onclick = () => {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) return alert("Speech recognition not supported.");
+
+  const recognition = new SpeechRecognition();
+  recognition.lang = "en-US";
+  recognition.interimResults = false;
+
+  recognition.start();
+
+  recognition.onresult = (event) => {
+    const transcript = event.results[0][0].transcript;
+    appendMessage("user", transcript);
+    getBotResponse(transcript);
+  };
+
+  recognition.onerror = (event) => {
+    appendMessage("bot", "Voice input failed.");
+  };
+};
